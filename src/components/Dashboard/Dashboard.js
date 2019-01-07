@@ -118,10 +118,62 @@ export class Dashboard extends Component {
         ) {
           dateRange = "all";
           this.props.history.push(
-            `/dashboard?query=${query}&page=${
-              this.state.currentPage
-            }&type=all&sort=by${this.state.sort}&dateRange=${this.state.date}`
+            `/dashboard?query=${query}&page=${page}&type=all&sort=by${sort}&dateRange=${dateRange}`
           );
+        }
+        let apiRequestUrl = "";
+        if (dateRange === "all") {
+          apiRequestUrl = `https://hn.algolia.com/api/v1/${
+            sort === "Date" ? "search_by_date" : "search"
+          }?query=${query}&page=${page}&tags=${type === "all" ? "" : type}`;
+        } else if (dateRange === "past24h") {
+          const last24hTime = moment()
+            .subtract(1, "day")
+            .unix();
+          this.setState({
+            lastTime: last24hTime
+          });
+          apiRequestUrl = `https://hn.algolia.com/api/v1/${
+            sort === "Date" ? "search_by_date" : "search"
+          }?query=${query}&page=${page}&tags=${
+            type === "all" ? "" : type
+          }&numericFilters=["created_at_i>${last24hTime}"]`;
+        } else if (dateRange === "pastWeek") {
+          const pastWeekTime = moment()
+            .subtract(7, "days")
+            .unix();
+          this.setState({
+            lastTime: pastWeekTime
+          });
+          apiRequestUrl = `https://hn.algolia.com/api/v1/${
+            sort === "Date" ? "search_by_date" : "search"
+          }?query=${query}&page=${page}&tags=${
+            type === "all" ? "" : type
+          }&numericFilters=["created_at_i>${pastWeekTime}"]`;
+        } else if (dateRange === "pastMonth") {
+          const pastMonthTime = moment()
+            .subtract(1, "months")
+            .unix();
+          this.setState({
+            lastTime: pastMonthTime
+          });
+          apiRequestUrl = `https://hn.algolia.com/api/v1/${
+            this.state.sort === "Date" ? "search_by_date" : "search"
+          }?query=${query}&page=${page}&tags=${
+            type === "all" ? "" : type
+          }&numericFilters=["created_at_i>${pastMonthTime}"]`;
+        } else if (dateRange === "pastYear") {
+          const pastYearTime = moment()
+            .subtract(1, "years")
+            .unix();
+          this.setState({
+            lastTime: pastYearTime
+          });
+          apiRequestUrl = `https://hn.algolia.com/api/v1/${
+            sort === "Date" ? "search_by_date" : "search"
+          }?query=${query}&page=${page}&tags=${
+            type === "all" ? "" : type
+          }&numericFilters=["created_at_i>${pastYearTime}"]`;
         }
         if (dateRange === "custom") {
           this.setState({
@@ -173,77 +225,32 @@ export class Dashboard extends Component {
             }&type=all&sort=by${this.state.sort}&dateRange=${this.state.date}`
           );
         }
-        if (this.state.sort === "Date") {
-          axios
-            .get(
-              `https://hn.algolia.com/api/v1/${
-                this.state.sort === "Date" ? "search_by_date" : ""
-              }?query=${this.state.queryString}&page=${
-                this.state.currentPage
-              }&tags=${this.state.type === "all" ? "" : this.state.type}`
-            )
-            .then(res => {
-              console.log(this.state, "in axios get component did mount");
-              this.setState({
-                dataReceieved: res.data.hits,
-                totalPages: res.data.nbPages,
-                currentPage: res.data.page,
-                totalSearchResults: res.data.nbHits,
-                isLoading: false
-              });
-              if (this.state.queryString !== "") {
-                const userRef = db
-                  .collection("users")
-                  .where("email", "==", user.email);
-                userRef.get().then(querySnapshot => {
-                  querySnapshot.forEach(doc => {
-                    db.collection("users")
-                      .doc(doc.id)
-                      .collection("history")
-                      .add({
-                        search: this.state.queryString,
-                        timeOfSearch: new Date()
-                      });
+        axios.get(apiRequestUrl).then(res => {
+          console.log(this.state, "in axios get component did mount");
+          this.setState({
+            dataReceieved: res.data.hits,
+            totalPages: res.data.nbPages,
+            currentPage: res.data.page,
+            totalSearchResults: res.data.nbHits,
+            isLoading: false
+          });
+          if (this.state.queryString !== "") {
+            const userRef = db
+              .collection("users")
+              .where("email", "==", user.email);
+            userRef.get().then(querySnapshot => {
+              querySnapshot.forEach(doc => {
+                db.collection("users")
+                  .doc(doc.id)
+                  .collection("history")
+                  .add({
+                    search: this.state.queryString,
+                    timeOfSearch: new Date()
                   });
-                });
-              }
-            });
-        } else {
-          axios
-            .get(
-              `https://hn.algolia.com/api/v1/search?query=${
-                this.state.queryString
-              }&page=${this.state.currentPage}&tags=${
-                this.state.type === "all" ? "" : this.state.type
-              }`
-            )
-            .then(res => {
-              console.log(this.state, "in axios get component did mount");
-              this.setState({
-                dataReceieved: res.data.hits,
-                totalPages: res.data.nbPages,
-                currentPage: res.data.page,
-                totalSearchResults: res.data.nbHits,
-                isLoading: false
               });
-              if (this.state.queryString !== "") {
-                const userRef = db
-                  .collection("users")
-                  .where("email", "==", user.email);
-                userRef.get().then(querySnapshot => {
-                  querySnapshot.forEach(doc => {
-                    db.collection("users")
-                      .doc(doc.id)
-                      .collection("history")
-                      .add({
-                        search: this.state.queryString,
-                        timeOfSearch: new Date()
-                      });
-                  });
-                });
-              }
             });
-        }
+          }
+        });
       } else {
         this.props.history.push("/");
       }
@@ -254,45 +261,71 @@ export class Dashboard extends Component {
       queryString: query
     });
     this.props.history.push(
-      `/dashboard?query=${query}&page=0&type=${this.state.type}&dateRange=${
-        this.state.date
-      }`
+      `/dashboard?query=${query}&page=0&type=${
+        this.state.type
+      }&sort=by${this.state.sort}&dateRange=${this.state.date}`
     );
-    axios
-      .get(
-        `https://hn.algolia.com/api/v1/search?query=${query}&page=0&tags=${
-          this.state.type === "all" ? "" : this.state.type
-        }`
-      )
-      .then(res => {
-        this.setState({
-          dataReceieved: res.data.hits,
-          totalPages: res.data.nbPages,
-          currentPage: res.data.page
-        });
+    let apiRequestUrl = "";
+    if (this.state.date === "all") {
+      apiRequestUrl = `https://hn.algolia.com/api/v1/${
+        this.state.sort === "Date" ? "search_by_date" : "search"
+      }?query=${query}&page=0&tags=${
+        this.state.type === "all" ? "" : this.state.type
+      }`;
+    } else if (this.state.date === "custom") {
+      apiRequestUrl = `https://hn.algolia.com/api/v1/${
+        this.state.sort === "Date" ? "search_by_date" : "search"
+      }?query=${query}&page=0&tags=${
+        this.state.type === "all" ? "" : this.state.type
+      }&numericFilters=["created_at_i>${
+        this.state.customStartDate
+      }","created_at_i<${this.state.customEndDate}"]`;
+    } else {
+      apiRequestUrl = `https://hn.algolia.com/api/v1/${
+        this.state.sort === "Date" ? "search_by_date" : "search"
+      }?query=${query}&page=0&tags=${
+        this.state.type === "all" ? "" : this.state.type
+      }&numericFilters=["created_at_i>${this.state.lastTime}"]`;
+    }
+    axios.get(apiRequestUrl).then(res => {
+      console.log(res.data);
+      this.setState({
+        dataReceieved: res.data.hits,
+        totalPages: res.data.nbPages,
+        currentPage: res.data.page
       });
+    });
   };
   onPageChangeHandler = page => {
-    console.log(
-      `/dashboard?query=${this.state.queryString}&page=${page - 1}&type=${
-        this.state.type
-      }`
-    );
-    axios
-      .get(
-        `https://hn.algolia.com/api/v1/search?query=${
-          this.state.queryString
-        }&page=${page - 1}&tags=${
-          this.state.type === "all" ? "" : this.state.type
-        }`
-      )
-      .then(res => {
-        this.setState({
-          dataReceieved: res.data.hits,
-          totalPages: res.data.nbPages,
-          currentPage: res.data.page
-        });
+    let apiRequestUrl = "";
+    if (this.state.date === "all") {
+      apiRequestUrl = `https://hn.algolia.com/api/v1/${
+        this.state.sort === "Date" ? "search_by_date" : "search"
+      }?query=${this.state.queryString}&page=${page - 1}&tags=${
+        this.state.type === "all" ? "" : this.state.type
+      }`;
+    } else if (this.state.date === "custom") {
+      apiRequestUrl = `https://hn.algolia.com/api/v1/${
+        this.state.sort === "Date" ? "search_by_date" : "search"
+      }?query=${this.state.queryString}&page=${page - 1}&tags=${
+        this.state.type === "all" ? "" : this.state.type
+      }&numericFilters=["created_at_i>${
+        this.state.customStartDate
+      }","created_at_i<${this.state.customEndDate}"]`;
+    } else {
+      apiRequestUrl = `https://hn.algolia.com/api/v1/${
+        this.state.sort === "Date" ? "search_by_date" : "search"
+      }?query=${this.state.queryString}&page=${page - 1}&tags=${
+        this.state.type === "all" ? "" : this.state.type
+      }&numericFilters=["created_at_i>${this.state.lastTime}"]`;
+    }
+    axios.get(apiRequestUrl).then(res => {
+      this.setState({
+        dataReceieved: res.data.hits,
+        totalPages: res.data.nbPages,
+        currentPage: res.data.page
       });
+    });
   };
   onChangeSearchFilterHandler = (event, { value }) => {
     const querySearch = this.state.queryString;
@@ -300,27 +333,45 @@ export class Dashboard extends Component {
     this.setState({
       type
     });
+    let apiRequestUrl = "";
+    if (this.state.date === "all") {
+      apiRequestUrl = `https://hn.algolia.com/api/v1/${
+        this.state.sort === "Date" ? "search_by_date" : "search"
+      }?query=${this.state.queryString}&page=${this.state.currentPage}&tags=${
+        type === "all" ? "" : type
+      }`;
+    } else if (this.state.date === "custom") {
+      apiRequestUrl = `https://hn.algolia.com/api/v1/${
+        this.state.sort === "Date" ? "search_by_date" : "search"
+      }?query=${this.state.queryString}&page=${this.state.currentPage}&tags=${
+        type === "all" ? "" : type
+      }&numericFilters=["created_at_i>${
+        this.state.customStartDate
+      }","created_at_i<${this.state.customEndDate}"]`;
+    } else {
+      apiRequestUrl = `https://hn.algolia.com/api/v1/${
+        this.state.sort === "Date" ? "search_by_date" : "search"
+      }?query=${this.state.queryString}&page=${this.state.currentPage}&tags=${
+        type === "all" ? "" : type
+      }&numericFilters=["created_at_i>${this.state.lastTime}"]`;
+    }
     type = value === "all" ? "" : value;
     if (this.state.sort === "Popularity") {
-      console.log(value);
-      axios
-        .get(
-          `http://hn.algolia.com/api/v1/search?query=${querySearch}&page=0&tags=${type}`
-        )
-        .then(({ data }) => {
-          console.log(data);
-          this.props.history.push(
-            `/dashboard?query=${querySearch}&page=0&type=${value}&sort=by${
-              this.state.sort
-            }&dateRange=${this.state.date}`
-          );
-          this.setState({
-            type: value,
-            dataReceieved: data.hits,
-            totalPages: data.nbPages,
-            currentPage: 0
-          });
+      console.log(value, type);
+      axios.get(apiRequestUrl).then(({ data }) => {
+        console.log(data);
+        this.props.history.push(
+          `/dashboard?query=${querySearch}&page=${
+            this.state.currentPage
+          }&type=${type}&sort=by${this.state.sort}&dateRange=${this.state.date}`
+        );
+        this.setState({
+          type: value,
+          dataReceieved: data.hits,
+          totalPages: data.nbPages,
+          currentPage: 0
         });
+      });
     } else {
       console.log(value);
       this.props.history.push(
@@ -328,76 +379,75 @@ export class Dashboard extends Component {
           this.state.currentPage
         }&type=${value}&sort=by${this.state.sort}&dateRange=${this.state.date}`
       );
-      axios
-        .get(
-          `https://hn.algolia.com/api/v1/${
-            this.state.sort === "Date" ? "search_by_date" : ""
-          }?query=${this.state.queryString}&page=${
-            this.state.currentPage
-          }&tags=${type === "all" ? "" : type}`
-        )
-        .then(res => {
-          console.log(res.data);
-          this.setState({
-            dataReceieved: res.data.hits,
-            totalPages: res.data.nbPages,
-            currentPage: res.data.page,
-            totalSearchResults: res.data.nbHits,
-            isLoading: false
-          });
+      axios.get(apiRequestUrl).then(res => {
+        console.log(res.data);
+        this.setState({
+          dataReceieved: res.data.hits,
+          totalPages: res.data.nbPages,
+          currentPage: res.data.page,
+          totalSearchResults: res.data.nbHits,
+          isLoading: false
         });
+      });
     }
   };
   onChangePopularityFilterHandler = (event, { value }) => {
     this.setState({
       sort: value
     });
+    let apiRequestUrl = "";
+    if (this.state.date === "all") {
+      apiRequestUrl = `https://hn.algolia.com/api/v1/${
+        value === "Date" ? "search_by_date" : "search"
+      }?query=${this.state.queryString}&page=${this.state.currentPage}&tags=${
+        this.state.type === "all" ? "" : this.state.type
+      }`;
+    } else if (this.state.date === "custom") {
+      apiRequestUrl = `https://hn.algolia.com/api/v1/${
+        value === "Date" ? "search_by_date" : "search"
+      }?query=${this.state.queryString}&page=${this.state.currentPage}&tags=${
+        this.state.type === "all" ? "" : this.state.type
+      }&numericFilters=["created_at_i>${
+        this.state.customStartDate
+      }","created_at_i<${this.state.customEndDate}"]`;
+    } else {
+      apiRequestUrl = `https://hn.algolia.com/api/v1/${
+        value === "Date" ? "search_by_date" : "search"
+      }?query=${this.state.queryString}&page=${this.state.currentPage}&tags=${
+        this.state.type === "all" ? "" : this.state.type
+      }&numericFilters=["created_at_i>${this.state.lastTime}"]`;
+    }
     if (value === "Date") {
       this.props.history.push(
         `/dashboard?query=${this.state.queryString}&page=${
           this.state.currentPage
         }&type=all&sort=by${value}&dateRange=${this.state.date}`
       );
-      axios
-        .get(
-          `https://hn.algolia.com/api/v1/${
-            value === "Date" ? "search_by_date" : ""
-          }?query=${this.state.queryString}&page=${
-            this.state.currentPage
-          }&tags=${this.state.type === "all" ? "" : this.state.type}`
-        )
-        .then(res => {
-          this.setState({
-            dataReceieved: res.data.hits,
-            totalPages: res.data.nbPages,
-            currentPage: res.data.page,
-            totalSearchResults: res.data.nbHits,
-            isLoading: false
-          });
+      axios.get(apiRequestUrl).then(res => {
+        console.log(res.data)
+        this.setState({
+          dataReceieved: res.data.hits,
+          totalPages: res.data.nbPages,
+          currentPage: res.data.page,
+          totalSearchResults: res.data.nbHits,
+          isLoading: false
         });
+      });
     } else {
       this.props.history.push(
         `/dashboard?query=${this.state.queryString}&page=${
           this.state.currentPage
         }&type=all&sort=by${value}&dateRange=${this.state.date}`
       );
-      axios
-        .get(
-          `https://hn.algolia.com/api/v1/search?query=${
-            this.state.queryString
-          }&page=${this.state.currentPage}&tags=${
-            this.state.type === "all" ? "" : this.state.type
-          }`
-        )
-        .then(res => {
-          this.setState({
-            dataReceieved: res.data.hits,
-            totalPages: res.data.nbPages,
-            currentPage: res.data.page,
-            totalSearchResults: res.data.nbHits,
-            isLoading: false
-          });
+      axios.get(apiRequestUrl).then(res => {
+        this.setState({
+          dataReceieved: res.data.hits,
+          totalPages: res.data.nbPages,
+          currentPage: res.data.page,
+          totalSearchResults: res.data.nbHits,
+          isLoading: false
         });
+      });
     }
   };
   onChangeDateFilterHandler = (event, { value }) => {
@@ -420,6 +470,9 @@ export class Dashboard extends Component {
       const last24hTime = moment()
         .subtract(1, "day")
         .unix();
+      this.setState({
+        lastTime: last24hTime
+      });
       apiRequestUrl = `https://hn.algolia.com/api/v1/${
         this.state.sort === "Date" ? "search_by_date" : "search"
       }?query=${this.state.queryString}&page=${this.state.currentPage}&tags=${
@@ -429,6 +482,9 @@ export class Dashboard extends Component {
       const pastWeekTime = moment()
         .subtract(7, "days")
         .unix();
+      this.setState({
+        lastTime: pastWeekTime
+      });
       apiRequestUrl = `https://hn.algolia.com/api/v1/${
         this.state.sort === "Date" ? "search_by_date" : "search"
       }?query=${this.state.queryString}&page=${this.state.currentPage}&tags=${
@@ -438,6 +494,9 @@ export class Dashboard extends Component {
       const pastMonthTime = moment()
         .subtract(1, "months")
         .unix();
+      this.setState({
+        lastTime: pastMonthTime
+      });
       apiRequestUrl = `https://hn.algolia.com/api/v1/${
         this.state.sort === "Date" ? "search_by_date" : "search"
       }?query=${this.state.queryString}&page=${this.state.currentPage}&tags=${
@@ -447,6 +506,9 @@ export class Dashboard extends Component {
       const pastYearTime = moment()
         .subtract(1, "years")
         .unix();
+      this.setState({
+        lastTime: pastYearTime
+      });
       apiRequestUrl = `https://hn.algolia.com/api/v1/${
         this.state.sort === "Date" ? "search_by_date" : "search"
       }?query=${this.state.queryString}&page=${this.state.currentPage}&tags=${
@@ -481,6 +543,10 @@ export class Dashboard extends Component {
     }?query=${this.state.queryString}&page=${this.state.currentPage}&tags=${
       this.state.type === "all" ? "" : this.state.type
     }&numericFilters=["created_at_i>${startDate}","created_at_i<${endDate}"]`;
+    this.setState({
+      customStartDate: startDate,
+      customEndDate: endDate
+    });
     axios.get(apiRequestUrl).then(res => {
       this.setState({
         dataReceieved: res.data.hits,
@@ -647,9 +713,9 @@ export class Dashboard extends Component {
                     <Link
                       to={`/dashboard?query=${
                         this.state.queryString
-                      }&page=${this.state.currentPage - 1}&tags=${
-                        this.state.type === "all" ? "" : this.state.type
-                      }`}
+                      }&page=${this.state.currentPage - 1}&type=${
+                        this.state.type
+                      }&sort=by${this.state.sort}&dateRange=${this.state.date}`}
                       style={{
                         width: "30px",
                         padding: "0px"
@@ -690,9 +756,9 @@ export class Dashboard extends Component {
                         onClick={() => this.onPageChangeHandler(page)}
                         to={`/dashboard?query=${this.state.queryString}&page=${
                           this.state.currentPage
-                        }&tags=${
-                          this.state.type === "all" ? "" : this.state.type
-                        }`}
+                        }&type=${this.state.type}&sort=by${
+                          this.state.sort
+                        }&dateRange=${this.state.date}`}
                       >
                         {page}
                       </Link>
@@ -705,9 +771,9 @@ export class Dashboard extends Component {
                       onClick={() => this.onPageChangeHandler(page)}
                       to={`/dashboard?query=${
                         this.state.queryString
-                      }&page=${page - 1}&tags=${
-                        this.state.type === "all" ? "" : this.state.type
-                      }`}
+                      }&page=${page - 1}&type=${this.state.type}&sort=by${
+                        this.state.sort
+                      }&dateRange=${this.state.date}`}
                     >
                       {page}
                     </Link>
@@ -718,9 +784,9 @@ export class Dashboard extends Component {
                 <li class="active">
                   <Link
                     to={`/dashboard?query=${this.state.queryString}&page=${this
-                      .state.currentPage + 1}&tags=${
-                      this.state.type === "all" ? "" : this.state.type
-                    }`}
+                      .state.currentPage + 1}&type=${this.state.type}&sort=by${
+                      this.state.sort
+                    }&dateRange=${this.state.date}`}
                     style={{
                       width: "30px",
                       padding: "0px"

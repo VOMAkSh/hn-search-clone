@@ -31,14 +31,14 @@ export class SearchHeader extends Component {
   };
 
   onChangeHandler = event => {
+    this.setState({
+      queryString: event.target.value
+    });
     if (this.props.queryString !== "") {
       this.setState({
         isTyping: true
       });
     }
-    this.setState({
-      queryString: event.target.value
-    });
   };
   onSearchQuery = () => {
     const userRef = db
@@ -85,11 +85,11 @@ export class SearchHeader extends Component {
                 src="https://hn.algolia.com/assets/logo-hn-search.png"
                 className="left"
                 style={{
-                  height: "50px",
+                  height: "40px",
                   display: "inline-block",
                   marginTop: "10px",
                   marginLeft: "10px",
-                  width: "50px"
+                  width: "40px"
                 }}
                 alt="logo"
               />
@@ -97,7 +97,7 @@ export class SearchHeader extends Component {
                 style={{
                   display: "inline-block",
                   position: "absolute",
-                  left: 70,
+                  left: 60,
                   fontSize: "14px"
                 }}
               >
@@ -106,7 +106,7 @@ export class SearchHeader extends Component {
               <ul
                 className="left-align"
                 style={{
-                  marginLeft: "95px"
+                  marginLeft: "99px"
                 }}
               >
                 <li
